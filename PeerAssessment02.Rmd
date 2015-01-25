@@ -1,0 +1,106 @@
+The impact of Severe Weather in the US
+========================================================
+
+#### In this data analysis project, I used the data from NOAA Storm Database to analyze the impact of severe weather events. By looking into the data, I mainly asked three questions. They are which states are most affected by the severe weather, which types of events are most harmful with respect to population health and which types of events have the greatest economic consequences.
+
+# Load the data into R
+```{r, echo = TRUE}
+library(R.utils)
+
+#download the data from the website
+if (!file.exists("/Users/helenxu/Desktop/Coursera/Reproducible Research/PeerAssessment02/repdata-data-StormData.csv.bz2")) {
+    download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2","/Users/helenxu/Desktop/Coursera/Reproducible Research/PeerAssessment02/repdata-data-StormData.csv.bz2")
+}
+if (!file.exists("/Users/helenxu/Desktop/Coursera/Reproducible Research/PeerAssessment02/repdata-data-StormData.csv")) {
+    bunzip2("/Users/helenxu/Desktop/Coursera/Reproducible Research/PeerAssessment02/repdata-data-StormData.csv.bz2","/Users/helenxu/Desktop/Coursera/Reproducible Research/PeerAssessment02/repdata-data-StormData.csv",remove = FALSE )
+}
+
+data = read.csv("repdata-data-StormData.csv")
+
+# Let's take a look at the data.
+str(data)
+```
+
+# Some Exploratory Data Analysis
+```{r, echo = TRUE}
+head(data, n = 2, header = T)
+```
+
+# Data Processing
+```{r, echo = TRUE}
+# In the dataset, we find that there are two variables "PROPDMGEXP" and "CROPDMGEXP". In order
+# to know the amount of damage of these disasters, we have to multiply the exponentials by the
+# numbers to get the total amount.
+unique(data$PROPDMGEXP)
+data$PEXP[data$PROPDMGEXP == "-"] = 0
+data$PEXP[data$PROPDMGEXP == "?"] = 0
+data$PEXP[data$PROPDMGEXP == "+"] = 0
+data$PEXP[data$PROPDMGEXP == "0"] = 1
+data$PEXP[data$PROPDMGEXP == "1"] = 10
+data$PEXP[data$PROPDMGEXP == "2"] = 1e+2
+data$PEXP[data$PROPDMGEXP == "3"] = 1e+3
+data$PEXP[data$PROPDMGEXP == "4"] = 1e+4
+data$PEXP[data$PROPDMGEXP == "5"] = 1e+5
+data$PEXP[data$PROPDMGEXP == "6"] = 1e+6
+data$PEXP[data$PROPDMGEXP == "7"] = 1e+7
+data$PEXP[data$PROPDMGEXP == "8"] = 1e+8
+data$PEXP[data$PROPDMGEXP == "B"] = 1e+9
+data$PEXP[data$PROPDMGEXP == "h"] = 100
+data$PEXP[data$PROPDMGEXP == "H"] = 100
+data$PEXP[data$PROPDMGEXP == "K"] = 1000
+data$PEXP[data$PROPDMGEXP == "m"] = 1e+6
+data$PEXP[data$PROPDMGEXP == "M"] = 1e+6
+data$PROPdmg = data$PROPDMG * data$PEXP
+
+# Apply the same technique to the crop damage data
+unique(data$CROPDMGEXP)
+data$CEXP[data$CROPDMGEXP == "?"] = 0
+data$CEXP[data$CROPDMGEXP == "0"] = 1
+data$CEXP[data$CROPDMGEXP == "2"] = 100
+data$CEXP[data$CROPDMGEXP == "B"] = 1e+9
+data$CEXP[data$CROPDMGEXP == "k"] = 1000
+data$CEXP[data$CROPDMGEXP == "K"] = 1000
+data$CEXP[data$CROPDMGEXP == "m"] = 1e+6
+data$CEXP[data$CROPDMGEXP == "M"] = 1e+6
+data$CROPdmg = data$CROPDMG * data$CEXP
+```
+
+# Results
+
+## We want to find out which States in the US have the most storm records.
+```{r, echo = TRUE}
+state = data$STATE
+# All the records have state data in this dataset
+any(is.na(state))
+stateTable = sort(table(state), decreasing = TRUE)[1:10]
+barplot(stateTable,xlab = "state", ylab = "Frequency", main = "Top 10 most affected States in the US")
+```
+
+## We want to know which types of events are most harmful to population health.
+
+```{r, echo = TRUE}
+library(plyr)
+fatalities = aggregate(FATALITIES ~ EVTYPE, data = data, sum)
+injuries = aggregate(INJURIES ~ EVTYPE, data = data, sum)
+fatalities10 = fatalities[order(-fatalities$FATALITIES),][1:10,]
+injuries10 = injuries[order(-injuries$INJURIES),][1:10,]
+par(mfrow = c(2, 1))
+barplot(fatalities10$FATALITIES, names = fatalities10$EVTYPE, las = 2, cex.names = 0.8, col = "red", main = "Top ten events that caused most fatalities", ylab = "Number of fatalities")
+barplot(injuries10$INJURIES, names = injuries10$EVTYPE, las = 2, cex.names = 0.8, col = "yellow", main = "Top ten events that caused most injuries", ylab = "Number of injuries")
+```
+
+## We want to know which types of events have the greatest economic consequences.
+```{r, echo = TRUE}
+propdmg = aggregate(PROPdmg~EVTYPE, data = data, sum)
+cropdmg = aggregate(CROPdmg~EVTYPE, data = data, sum)
+propdmg10 = propdmg[order(-propdmg$PROPdmg),][1:10,]
+cropdmg10 = cropdmg[order(-cropdmg$CROPdmg),][1:10,]
+par(mfrow = c(2, 1))
+barplot(propdmg10$PROPdmg/(1e+9), las = 2, names = propdmg10$EVTYPE,
+        main = "Top 10 events that caused greatest property damage",
+        ylab = "Cost of the damage ($ Billion)", col = "blue", cex.names = 0.8)
+barplot(cropdmg10$CROPdmg/(1e+9), las = 2, names = cropdmg10$EVTYPE,
+        main = "Top 10 events that caused greatest crop damage",
+        ylab = "Cost of the damage ($ Billion)", col = "green", cex.names = 0.8)
+
+```
